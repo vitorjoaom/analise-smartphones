@@ -1,0 +1,10 @@
+{
+  "best_model": "Random Forest",
+  "rf_mae": 17146.95,
+  "rf_r2": 0.4721,
+  "gb_mae": 17172.08,
+  "gb_r2": 0.4672,
+  "price_2032": 42113.48,
+  "ram_2032": 7.55,
+  "top_price_feature": "os_enc"
+}
