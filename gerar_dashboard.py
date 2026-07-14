@@ -79,12 +79,17 @@ kpi_html = "\n".join(
 )
 
 section_html = "\n".join(
-    f"""    <section class="chart-section">
+    f"""    <section class="chart-section" id="{frag}">
       <h2>{title}</h2>
       <p class="chart-desc">{desc}</p>
       <div class="chart-box">{load_fragment(frag)}</div>
     </section>"""
     for frag, title, desc in sections
+)
+
+nav_html = "\n".join(
+    f"""      <a href="#{frag}">{title}</a>"""
+    for frag, title, _ in sections
 )
 
 html = f"""<!DOCTYPE html>
@@ -128,7 +133,41 @@ html = f"""<!DOCTYPE html>
     max-width: 760px;
     margin-top: 10px;
   }}
-  main {{ padding: 10px 6vw 60px; }}
+  nav.topnav {{
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 12px 6vw;
+    background: rgba(33, 31, 28, 0.92);
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--grid);
+  }}
+  nav.topnav a {{
+    flex: 0 0 auto;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.82rem;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }}
+  nav.topnav a:hover {{
+    color: var(--text);
+    border-color: var(--mint);
+    background: var(--panel);
+  }}
+  nav.topnav a:first-child {{
+    color: var(--mint);
+    border-color: var(--mint);
+  }}
+  html {{ scroll-behavior: smooth; }}
+  main {{ padding: 10px 6vw 60px; scroll-margin-top: 60px; }}
+  .chart-section {{ scroll-margin-top: 60px; }}
   .kpi-grid {{
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -193,8 +232,12 @@ html = f"""<!DOCTYPE html>
     15,000 smartphone listings. Every chart below is interactive: hover, zoom,
     or click a legend entry to filter series.</p>
   </header>
+  <nav class="topnav">
+      <a href="#kpis">KPIs</a>
+{nav_html}
+  </nav>
   <main>
-    <div class="kpi-grid">
+    <div class="kpi-grid" id="kpis">
 {kpi_html}
     </div>
 {section_html}
