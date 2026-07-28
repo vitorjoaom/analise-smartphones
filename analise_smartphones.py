@@ -1,16 +1,47 @@
+import json
+import os
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import seaborn as sns
+import plotly.graph_objects as go
+
+from data_cleaning import load_and_clean
 
 sns.set_theme(style="whitegrid", palette="muted")
 plt.rcParams["figure.dpi"] = 120
 
-df = pd.read_csv("smartphones.csv")
+# ── Paleta "cores sabão" (mesma usada em analise_preditiva.py, para consistência) ──
+SABAO = [
+    "#B5D5C5", "#F7C5CC", "#C3D4F0", "#F5E6C8", "#D4C5F0",
+    "#C8EAE2", "#F0D4C5", "#D5EAB5", "#F0C5E0", "#C5D5F0",
+]
+BG, GRID, FONT_CLR = "#F8F6F2", "#E8E4DE", "#4A4540"
+LAYOUT_BASE = dict(
+    paper_bgcolor=BG, plot_bgcolor=BG,
+    font=dict(color=FONT_CLR, family="Segoe UI, Arial"),
+    title_font=dict(size=18, color=FONT_CLR),
+    legend=dict(bgcolor=BG, bordercolor=GRID, borderwidth=1),
+)
+
+FRAG_DIR = os.path.join("outputs", "fragments")
+os.makedirs(FRAG_DIR, exist_ok=True)
+
+
+def save_fragment(fig, name):
+    fig.write_html(os.path.join(FRAG_DIR, f"{name}.html"),
+                    full_html=False, include_plotlyjs=False,
+                    config={"displaylogo": False})
+    print(f"[✓] fragment: {name}.html")
+
+
+# ── 0. Aquisição + tratamento/limpeza dos dados ─────────────────────────────
+df = load_and_clean()
 
 # ── 1. Visão geral ──────────────────────────────────────────────────────────
-print("=" * 60)
-print("VISÃO GERAL DO DATASET")
+print("\n" + "=" * 60)
+print("VISÃO GERAL DO DATASET (pós-limpeza)")
 print("=" * 60)
 print(f"Registros : {len(df):,}")
 print(f"Colunas   : {df.shape[1]}")
@@ -79,7 +110,45 @@ plt.savefig("correlacao.png", bbox_inches="tight")
 plt.close()
 print("[Salvo] correlacao.png")
 
-# ── 7. Insights textuais ─────────────────────────────────────────────────────
+# ── 7. Agrupamento e agregação ───────────────────────────────────────────────
+print("\n" + "=" * 60)
+print("AGRUPAMENTO E AGREGAÇÃO")
+print("=" * 60)
+
+brand_summary = df.groupby("brand_name").agg(
+    qtd_modelos=("brand_name", "count"),
+    preco_medio=("price", "mean"),
+    ram_media=("ram", "mean"),
+    bateria_media=("battery_capacity", "mean"),
+    camera_media=("camera_mp", "mean"),
+    pct_5g=("network_support", lambda s: (s == "5G").mean() * 100),
+    pct_dual_sim=("dual_sim", lambda s: (s == "Yes").mean() * 100),
+).round(1).sort_values("qtd_modelos", ascending=False)
+os.makedirs("outputs", exist_ok=True)
+brand_summary.to_csv(os.path.join("outputs", "brand_summary.csv"))
+print("\nResumo agrupado por marca (outputs/brand_summary.csv):")
+print(brand_summary)
+
+year_summary = df.groupby("release_year").agg(
+    qtd_modelos=("release_year", "count"),
+    preco_medio=("price", "mean"),
+    ram_media=("ram", "mean"),
+    pct_5g=("network_support", lambda s: (s == "5G").mean() * 100),
+).round(1).sort_index()
+year_summary.to_csv(os.path.join("outputs", "year_summary.csv"))
+print("\nResumo agrupado por ano de lançamento (outputs/year_summary.csv):")
+print(year_summary)
+
+os_summary = df.groupby("operating_system").agg(
+    qtd_modelos=("operating_system", "count"),
+    preco_medio=("price", "mean"),
+    ram_media=("ram", "mean"),
+).round(1).sort_values("qtd_modelos", ascending=False)
+os_summary.to_csv(os.path.join("outputs", "os_summary.csv"))
+print("\nResumo agrupado por sistema operacional (outputs/os_summary.csv):")
+print(os_summary)
+
+# ── 8. Insights textuais ─────────────────────────────────────────────────────
 print("\n" + "=" * 60)
 print("INSIGHTS")
 print("=" * 60)
@@ -103,7 +172,7 @@ print(f"\nCorrelação preço×RAM   : {corr_price_ram:.3f}")
 corr_price_cam = df["price"].corr(df["camera_mp"])
 print(f"Correlação preço×câmera: {corr_price_cam:.3f}")
 
-# ── 8. Gráficos extras: RAM e armazenamento ──────────────────────────────────
+# ── 9. Gráficos extras: RAM e armazenamento ──────────────────────────────────
 fig, axes = plt.subplots(1, 2, figsize=(13, 5))
 
 ax = axes[0]
@@ -126,3 +195,132 @@ plt.close()
 print("[Salvo] ram_storage.png")
 
 print("\nAnálise concluída!")
+
+# ════════════════════════════════════════════════════════════════════════════════
+# GRÁFICOS INTERATIVOS (Plotly) — mesmas análises, versão interativa para o dashboard
+# ════════════════════════════════════════════════════════════════════════════════
+
+# 01 · Top 10 marcas
+fig_brands = go.Figure(go.Bar(
+    x=top_brands.index, y=top_brands.values,
+    marker=dict(color=SABAO[:len(top_brands)], line=dict(color=FONT_CLR, width=0.5)),
+    text=top_brands.values, textposition="outside",
+))
+fig_brands.update_layout(
+    **LAYOUT_BASE, title="🏷️ Top 10 Marcas por Quantidade de Modelos",
+    xaxis=dict(title="", gridcolor=GRID), yaxis=dict(title="Quantidade", gridcolor=GRID),
+)
+save_fragment(fig_brands, "01_top_brands")
+
+# 02 · Distribuição de preço — top 6 marcas (boxplot)
+fig_price_box = go.Figure()
+for i, brand in enumerate(top6):
+    fig_price_box.add_trace(go.Box(
+        y=df.loc[df["brand_name"] == brand, "price"], name=brand,
+        marker_color=SABAO[i % len(SABAO)], boxmean=True,
+    ))
+fig_price_box.update_layout(
+    **LAYOUT_BASE, title="💸 Distribuição de Preço — Top 6 Marcas",
+    yaxis=dict(title="Preço (R$)", gridcolor=GRID, tickformat=",.0f"),
+    showlegend=False,
+)
+save_fragment(fig_price_box, "02_price_by_brand")
+
+# 03 · Participação por sistema operacional
+fig_os = go.Figure(go.Pie(
+    labels=os_counts.index, values=os_counts.values, hole=0.45,
+    marker=dict(colors=SABAO, line=dict(color=BG, width=2)),
+))
+fig_os.update_layout(**LAYOUT_BASE, title="📱 Participação por Sistema Operacional")
+save_fragment(fig_os, "03_os_share")
+
+# 04 · Preço médio por ano de lançamento
+fig_price_year = go.Figure(go.Scatter(
+    x=price_year.index, y=price_year.values, mode="lines+markers",
+    line=dict(color=SABAO[0], width=3),
+    marker=dict(size=9, color=SABAO[0], line=dict(color=FONT_CLR, width=1)),
+))
+fig_price_year.update_layout(
+    **LAYOUT_BASE, title="📈 Preço Médio por Ano de Lançamento",
+    xaxis=dict(title="Ano", gridcolor=GRID),
+    yaxis=dict(title="Preço Médio (R$)", gridcolor=GRID, tickformat=",.0f"),
+)
+save_fragment(fig_price_year, "04_price_by_year")
+
+# 05 · Distribuição de RAM e Armazenamento
+ram_counts = df["ram"].value_counts().sort_index()
+storage_counts = df["storage"].value_counts().sort_index()
+fig_ram_storage = go.Figure()
+fig_ram_storage.add_trace(go.Bar(x=ram_counts.index.astype(str), y=ram_counts.values,
+                                  name="RAM (GB)", marker_color=SABAO[0]))
+fig_ram_storage.update_layout(
+    **LAYOUT_BASE, title="💾 Distribuição de RAM (GB)",
+    xaxis=dict(title="RAM (GB)", gridcolor=GRID, type="category"),
+    yaxis=dict(title="Quantidade", gridcolor=GRID),
+)
+save_fragment(fig_ram_storage, "05_ram_distribution")
+
+fig_storage = go.Figure(go.Bar(
+    x=storage_counts.index.astype(str), y=storage_counts.values,
+    marker_color=SABAO[7],
+))
+fig_storage.update_layout(
+    **LAYOUT_BASE, title="🗄️ Distribuição de Armazenamento (GB)",
+    xaxis=dict(title="Armazenamento (GB)", gridcolor=GRID, type="category"),
+    yaxis=dict(title="Quantidade", gridcolor=GRID),
+)
+save_fragment(fig_storage, "06_storage_distribution")
+
+# 07 · Mapa de correlação
+fig_corr = go.Figure(go.Heatmap(
+    z=corr.values, x=corr.columns, y=corr.columns,
+    colorscale=[[0, SABAO[1]], [0.5, BG], [1, SABAO[0]]],
+    zmid=0, text=corr.round(2).values, texttemplate="%{text}",
+    textfont=dict(size=10, color=FONT_CLR),
+))
+fig_corr.update_layout(
+    **LAYOUT_BASE, title="🔗 Mapa de Correlação entre Variáveis Numéricas",
+    height=560, xaxis=dict(gridcolor=GRID), yaxis=dict(gridcolor=GRID, autorange="reversed"),
+)
+save_fragment(fig_corr, "07_correlation_heatmap")
+
+# 08 · Tabela agrupada por marca
+brand_table = brand_summary.reset_index().head(10)
+fig_table = go.Figure(go.Table(
+    header=dict(
+        values=["Marca", "Qtd. Modelos", "Preço Médio (R$)", "RAM Média (GB)",
+                "Bateria Média (mAh)", "Câmera Média (MP)", "5G (%)", "Dual SIM (%)"],
+        fill_color=SABAO[0], font=dict(color=FONT_CLR, size=12), align="left",
+        height=32,
+    ),
+    cells=dict(
+        values=[brand_table[c] for c in
+                ["brand_name", "qtd_modelos", "preco_medio", "ram_media",
+                 "bateria_media", "camera_media", "pct_5g", "pct_dual_sim"]],
+        fill_color=[[BG, "#F2EFE8"] * len(brand_table)], font=dict(color=FONT_CLR, size=11),
+        align="left", height=28,
+        format=[None, None, ",.0f", ".1f", ",.0f", ".1f", ".1f", ".1f"],
+    ),
+))
+fig_table.update_layout(**LAYOUT_BASE, title="📊 Resumo Agrupado por Marca (Top 10)", height=430)
+save_fragment(fig_table, "08_brand_summary_table")
+
+# ── KPIs para o dashboard ────────────────────────────────────────────────────
+kpis_eda = {
+    "total_smartphones": int(len(df)),
+    "n_columns": int(df.shape[1]),
+    "n_brands": int(df["brand_name"].nunique()),
+    "top_brand": df["brand_name"].value_counts().idxmax(),
+    "priciest_brand": df.groupby("brand_name")["price"].mean().idxmax(),
+    "avg_price": round(float(df["price"].mean()), 2),
+    "median_price": round(float(df["price"].median()), 2),
+    "pct_5g": round(float(pct_5g), 1),
+    "pct_fingerprint": round(float(pct_fp), 1),
+    "pct_dual_sim": round(float(pct_dsim), 1),
+    "corr_price_ram": round(float(corr_price_ram), 3),
+    "corr_price_camera": round(float(corr_price_cam), 3),
+}
+os.makedirs("outputs", exist_ok=True)
+with open(os.path.join("outputs", "kpis_eda.json"), "w", encoding="utf-8") as f:
+    json.dump(kpis_eda, f, ensure_ascii=False, indent=2)
+print("[✓] outputs/kpis_eda.json")

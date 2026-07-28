@@ -1,3 +1,6 @@
+import json
+import os
+
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -10,7 +13,20 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_absolute_error, r2_score
 
+from data_cleaning import load_and_clean
+
 warnings.filterwarnings("ignore")
+
+FRAG_DIR = os.path.join("outputs", "fragments")
+os.makedirs(FRAG_DIR, exist_ok=True)
+
+
+def save_fragment(fig, name):
+    fig.write_html(os.path.join(FRAG_DIR, f"{name}.html"),
+                    full_html=False, include_plotlyjs=False,
+                    config={"displaylogo": False})
+    print(f"[✓] fragment: {name}.html")
+
 
 # ── Paleta "cores sabão" (pastéis suaves) ────────────────────────────────────
 SABAO = [
@@ -37,8 +53,8 @@ LAYOUT_BASE = dict(
     legend=dict(bgcolor=BG, bordercolor=GRID, borderwidth=1),
 )
 
-# ── Carregar dados ────────────────────────────────────────────────────────────
-df = pd.read_csv("smartphones.csv")
+# ── Carregar dados (já tratados/limpos por data_cleaning.py) ────────────────
+df = load_and_clean(verbose=False)
 
 print("=" * 65)
 print("  ANÁLISE PREDITIVA DE SMARTPHONES — VISÃO DE FUTURO")
@@ -109,6 +125,7 @@ fig1.update_layout(
 )
 fig1.write_html("01_projecao_preco.html")
 print("[✓] 01_projecao_preco.html")
+save_fragment(fig1, "08_projecao_preco")
 
 # ════════════════════════════════════════════════════════════════════════════════
 # BLOCO 2 · RANDOM FOREST — Previsão de preço por especificações
@@ -189,6 +206,7 @@ fig2.update_layout(
 )
 fig2.write_html("02_importancia_features.html")
 print("[✓] 02_importancia_features.html")
+save_fragment(fig2, "09_importancia_features")
 
 # ════════════════════════════════════════════════════════════════════════════════
 # BLOCO 3 · Previsto vs Real (scatter)
@@ -225,6 +243,7 @@ fig3.update_layout(
 )
 fig3.write_html("03_real_vs_previsto.html")
 print("[✓] 03_real_vs_previsto.html")
+save_fragment(fig3, "10_real_vs_previsto")
 
 # ════════════════════════════════════════════════════════════════════════════════
 # BLOCO 4 · Tendência futura das especificações (até 2032)
@@ -306,6 +325,7 @@ fig4.update_xaxes(gridcolor=GRID, zeroline=False)
 fig4.update_yaxes(gridcolor=GRID, zeroline=False)
 fig4.write_html("04_tendencias_specs.html")
 print("[✓] 04_tendencias_specs.html")
+save_fragment(fig4, "11_tendencias_specs")
 
 # ════════════════════════════════════════════════════════════════════════════════
 # BLOCO 5 · Dashboard final interativo — Marcas × Specs (bubble chart)
@@ -338,6 +358,7 @@ fig5.update_layout(
 )
 fig5.write_html("05_bubble_marcas.html")
 print("[✓] 05_bubble_marcas.html")
+save_fragment(fig5, "12_bubble_marcas")
 
 # ════════════════════════════════════════════════════════════════════════════════
 # BLOCO 6 · Relatório de insights preditivos
@@ -384,3 +405,19 @@ for f in ["01_projecao_preco.html", "02_importancia_features.html",
           "05_bubble_marcas.html"]:
     print(f"    · {f}")
 print("\n  Abra qualquer .html no navegador para interação completa.\n")
+
+# ── KPIs para o dashboard ────────────────────────────────────────────────────
+kpis_predictive = {
+    "best_model": melhor,
+    "rf_mae": round(float(rf_mae), 2),
+    "rf_r2": round(float(rf_r2), 4),
+    "gb_mae": round(float(gb_mae), 2),
+    "gb_r2": round(float(gb_r2), 4),
+    "price_2032": round(float(preds_ano[-1]), 2),
+    "ram_2032": round(float(max(preds_ram[-1], 0)), 2),
+    "top_price_feature": importances.index[-1],
+}
+os.makedirs("outputs", exist_ok=True)
+with open(os.path.join("outputs", "kpis_predictive.json"), "w", encoding="utf-8") as f:
+    json.dump(kpis_predictive, f, ensure_ascii=False, indent=2)
+print("[✓] outputs/kpis_predictive.json")
