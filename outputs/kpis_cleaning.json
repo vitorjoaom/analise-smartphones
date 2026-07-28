@@ -1,0 +1,16 @@
+{
+  "rows_raw": 15000,
+  "columns_raw": 25,
+  "duplicate_rows_removed": 0,
+  "duplicate_ids_removed": 0,
+  "rows_dropped_invalid_range": 0,
+  "missing_values_imputed": {},
+  "price_outliers_detected": 17,
+  "price_outlier_bounds": {
+    "lower": -73024.75,
+    "upper": 149137.75
+  },
+  "rows_clean": 15000,
+  "columns_clean": 25,
+  "rows_removed_total": 0
+}

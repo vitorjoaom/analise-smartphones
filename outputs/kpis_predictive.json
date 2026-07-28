@@ -1,0 +1,10 @@
+{
+  "best_model": "Gradient Boosting",
+  "rf_mae": 17144.56,
+  "rf_r2": 0.4721,
+  "gb_mae": 17101.53,
+  "gb_r2": 0.4717,
+  "price_2032": 42113.22,
+  "ram_2032": 7.55,
+  "top_price_feature": "os_enc"
+}

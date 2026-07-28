@@ -1,0 +1,14 @@
+{
+  "total_smartphones": 15000,
+  "n_columns": 25,
+  "n_brands": 10,
+  "top_brand": "Nokia",
+  "priciest_brand": "Apple",
+  "avg_price": 43470.29,
+  "median_price": 37944.0,
+  "pct_5g": 50.4,
+  "pct_fingerprint": 50.2,
+  "pct_dual_sim": 49.5,
+  "corr_price_ram": 0.006,
+  "corr_price_camera": -0.004
+}
